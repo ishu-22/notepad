@@ -2,134 +2,152 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Pro Teacher Whiteboard</title>
-    <!-- Fabric.js for drawing and PDF.js for file support -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Teacher Ultra-Board</title>
+    
+    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <style>
-        :root { --bg-color: #1a1a1a; --toolbar-color: #333; --accent: #007bff; }
-        body { margin: 0; background: #222; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        :root { --primary: #3d5afe; --dark: #121212; --panel: #1e1e1e; --text: #efefef; }
         
-        /* Toolbar at the bottom (PW style) */
+        body { 
+            margin: 0; background: var(--dark); color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif; overflow: hidden; touch-action: none;
+        }
+
+        /* Floating Responsive Toolbar */
         #toolbar {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: var(--toolbar-color); padding: 10px 20px; border-radius: 50px;
-            display: flex; gap: 12px; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 100;
+            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+            background: var(--panel); padding: 8px 15px; border-radius: 20px;
+            display: flex; gap: 8px; align-items: center; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.8); z-index: 1000;
+            max-width: 95vw; overflow-x: auto; border: 1px solid #333;
         }
 
-        .tool-btn { 
-            background: #444; border: none; color: white; padding: 8px 12px; 
-            border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 14px;
-        }
-        .tool-btn:hover { background: #555; }
-        .active { background: var(--accent) !important; }
+        .group { display: flex; gap: 5px; border-right: 1px solid #444; padding-right: 8px; margin-right: 3px; }
+        .group:last-child { border: none; }
 
-        #canvas-wrapper { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
-        input[type="color"] { width: 30px; height: 30px; border: none; padding: 0; cursor: pointer; border-radius: 50%; }
-        
+        button {
+            background: #2a2a2a; border: none; color: white; padding: 10px;
+            border-radius: 12px; cursor: pointer; font-size: 14px; white-space: nowrap;
+            transition: all 0.2s; min-width: 44px;
+        }
+        button:active { transform: scale(0.9); }
+        .active { background: var(--primary) !important; box-shadow: 0 0 10px var(--primary); }
+
+        canvas { touch-action: none; outline: none; }
+
+        #pdfInput { display: none; }
+
         /* Background styles */
-        .grid { background-image: radial-gradient(#444 1px, transparent 1px); background-size: 30px 30px; }
-        .ruled { background-image: linear-gradient(#444 1px, transparent 1px); background-size: 100% 30px; }
+        .grid { background-image: radial-gradient(#333 1px, transparent 1px); background-size: 40px 40px; }
+        .ruled { background-image: linear-gradient(#333 1px, transparent 1px); background-size: 100% 35px; }
+
+        @media (max-width: 600px) {
+            #toolbar { bottom: 10px; padding: 5px; border-radius: 12px; }
+            button { padding: 8px; font-size: 12px; }
+        }
     </style>
 </head>
 <body class="grid">
 
 <div id="toolbar">
-    <button class="tool-btn active" onclick="setMode('draw')">✏️ Pen</button>
-    <button class="tool-btn" onclick="setMode('highlighter')">🖍️ Highlight</button>
-    <button class="tool-btn" onclick="setMode('rect')">🟦 Rect</button>
-    <button class="tool-btn" onclick="setMode('circle')">⭕ Circle</button>
-    <button class="tool-btn" onclick="setMode('select')">🖱️ Select</button>
-    
-    <div style="width: 1px; height: 25px; background: #666; margin: 0 5px;"></div>
-    
-    <input type="color" id="colorPicker" value="#ffffff">
-    <select id="sizePicker" style="background:#444; color:white; border:none; border-radius:5px; padding:5px;">
-        <option value="3">Thin</option>
-        <option value="8" selected>Medium</option>
-        <option value="20">Thick</option>
-    </select>
+    <!-- Pens -->
+    <div class="group">
+        <button id="penBtn" class="active" onclick="setBrush('pen')">🖊️</button>
+        <button id="calligraphyBtn" onclick="setBrush('calligraphy')">✒️</button>
+        <button id="highlighterBtn" onclick="setBrush('highlighter')">🖍️</button>
+        <button id="eraserBtn" onclick="setBrush('eraser')">🧽</button>
+    </div>
 
-    <div style="width: 1px; height: 25px; background: #666; margin: 0 5px;"></div>
+    <!-- Colors & Size -->
+    <div class="group">
+        <input type="color" id="colorPicker" value="#ffffff" style="width:30px; height:30px; border:none; background:none;">
+        <select id="sizePicker" style="background:#2a2a2a; color:white; border:none; border-radius:5px;">
+            <option value="3">S</option>
+            <option value="8" selected>M</option>
+            <option value="15">L</option>
+        </select>
+    </div>
 
-    <button class="tool-btn" onclick="document.getElementById('pdfInput').click()">📄 Upload PDF</button>
-    <button class="tool-btn" onclick="downloadImage()" style="background:#28a745;">💾 Save</button>
-    <button class="tool-btn" onclick="clearBoard()" style="background:#dc3545;">🗑️ Clear</button>
-    
-    <select onchange="changeBG(this.value)" style="background:#444; color:white; border:none; border-radius:5px; padding:5px;">
-        <option value="dark">Dark Board</option>
-        <option value="white">Whiteboard</option>
-        <option value="grid">Grid</option>
-        <option value="ruled">Ruled</option>
-    </select>
+    <!-- Actions -->
+    <div class="group">
+        <button onclick="document.getElementById('pdfInput').click()">📁 PDF</button>
+        <button onclick="saveAsPDF()" style="background: #2e7d32;">💾 Save PDF</button>
+        <button onclick="clearCanvas()" style="background: #c62828;">🗑️</button>
+    </div>
 </div>
 
-<input type="file" id="pdfInput" accept="application/pdf" style="display:none;">
+<input type="file" id="pdfInput" accept="application/pdf">
 
-<div id="canvas-wrapper">
-    <canvas id="mainCanvas"></canvas>
-</div>
+<canvas id="c"></canvas>
 
 <script>
-    const canvas = new fabric.Canvas('mainCanvas', {
+    const { jsPDF } = window.jspdf;
+    const canvas = new fabric.Canvas('c', {
         width: window.innerWidth,
         height: window.innerHeight,
-        isDrawingMode: true
+        isDrawingMode: true,
+        backgroundColor: null
     });
 
-    // Default Brush Settings
-    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-    canvas.freeDrawingBrush.color = '#ffffff';
-    canvas.freeDrawingBrush.width = 8;
-
-    function setMode(mode) {
-        // Reset states
-        canvas.isDrawingMode = false;
-        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    // Initialize Brush
+    function updateBrush() {
+        const color = document.getElementById('colorPicker').value;
+        const width = parseInt(document.getElementById('sizePicker').value);
         
-        if (mode === 'draw') {
-            canvas.isDrawingMode = true;
-            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-            canvas.freeDrawingBrush.color = document.getElementById('colorPicker').value;
-            canvas.freeDrawingBrush.width = parseInt(document.getElementById('sizePicker').value);
-        } 
-        else if (mode === 'highlighter') {
-            canvas.isDrawingMode = true;
-            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-            let color = document.getElementById('colorPicker').value;
-            // Add transparency (Hex to RGBA)
-            canvas.freeDrawingBrush.color = color + '80'; 
-            canvas.freeDrawingBrush.width = 30;
-        }
-        else if (mode === 'rect') {
-            const rect = new fabric.Rect({
-                left: 100, top: 100, fill: 'transparent', stroke: document.getElementById('colorPicker').value, 
-                strokeWidth: 4, width: 100, height: 100
-            });
-            canvas.add(rect);
-        }
-        else if (mode === 'circle') {
-            const circle = new fabric.Circle({
-                left: 150, top: 150, radius: 50, fill: 'transparent', 
-                stroke: document.getElementById('colorPicker').value, strokeWidth: 4
-            });
-            canvas.add(circle);
-        }
-        else if (mode === 'select') {
-            canvas.isDrawingMode = false;
+        if (canvas.freeDrawingBrush) {
+            canvas.freeDrawingBrush.color = color;
+            canvas.freeDrawingBrush.width = width;
         }
     }
 
-    // PDF Upload Logic
+    function setBrush(type) {
+        canvas.isDrawingMode = true;
+        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        
+        if (type === 'pen') {
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+            document.getElementById('penBtn').classList.add('active');
+        } 
+        else if (type === 'calligraphy') {
+            canvas.freeDrawingBrush = new fabric.PatternBrush(canvas); // Simulating calligraphy
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+            canvas.freeDrawingBrush.strokeLineCap = 'square';
+            document.getElementById('calligraphyBtn').classList.add('active');
+        }
+        else if (type === 'highlighter') {
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+            const color = document.getElementById('colorPicker').value;
+            canvas.freeDrawingBrush.color = color + '50'; // 50 is hex for transparency
+            canvas.freeDrawingBrush.width = 35;
+            document.getElementById('highlighterBtn').classList.add('active');
+            return; // Skip the general updateBrush to keep transparency
+        }
+        else if (type === 'eraser') {
+            // Standard fabric doesn't have a 'remove' eraser without a plugin
+            // So we use a "Background Color" brush as a smart eraser
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+            canvas.freeDrawingBrush.color = '#121212'; 
+            canvas.freeDrawingBrush.width = 40;
+            document.getElementById('eraserBtn').classList.add('active');
+            return;
+        }
+        updateBrush();
+    }
+
+    // PDF Upload Logic (Rendering to Canvas)
     document.getElementById('pdfInput').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = async function() {
             const typedarray = new Uint8Array(this.result);
             const pdf = await pdfjsLib.getDocument(typedarray).promise;
-            const page = await pdf.getPage(1);
-            const viewport = page.getViewport({ scale: 1.5 });
+            const page = await pdf.getPage(1); // Load page 1
+            const viewport = page.getViewport({ scale: 2 });
             
             const tempCanvas = document.createElement('canvas');
             const context = tempCanvas.getContext('2d');
@@ -139,7 +157,7 @@
             await page.render({ canvasContext: context, viewport: viewport }).promise;
             
             fabric.Image.fromURL(tempCanvas.toDataURL(), (img) => {
-                img.set({ left: 50, top: 50, selectable: true });
+                img.set({ scaleX: 0.5, scaleY: 0.5, left: 10, top: 10 });
                 canvas.add(img);
                 canvas.sendToBack(img);
             });
@@ -147,25 +165,33 @@
         reader.readAsArrayBuffer(file);
     });
 
-    function changeBG(type) {
-        document.body.className = type;
-        if (type === 'white') canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
-        else canvas.setBackgroundColor('transparent', canvas.renderAll.bind(canvas));
+    // ACTUAL PDF EXPORT
+    function saveAsPDF() {
+        const imgData = canvas.toDataURL({ format: 'png', quality: 1 });
+        const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+        });
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save("lecture-notes.pdf");
     }
 
-    function clearBoard() { canvas.clear(); }
-
-    function downloadImage() {
-        const dataURL = canvas.toDataURL({ format: 'png', quality: 1 });
-        const link = document.createElement('a');
-        link.download = 'lecture-notes.png';
-        link.href = dataURL;
-        link.click();
+    function clearCanvas() {
+        if(confirm("Clear everything?")) canvas.clear();
     }
 
-    // Dynamic color/size updates
-    document.getElementById('colorPicker').onchange = (e) => canvas.freeDrawingBrush.color = e.target.value;
-    document.getElementById('sizePicker').onchange = (e) => canvas.freeDrawingBrush.width = parseInt(e.target.value);
+    // Handle Window Resize
+    window.addEventListener('resize', () => {
+        canvas.setDimensions({ width: window.innerWidth, height: window.innerHeight });
+    });
+
+    // Listeners for Color/Size changes
+    document.getElementById('colorPicker').onchange = updateBrush;
+    document.getElementById('sizePicker').onchange = updateBrush;
+
+    setBrush('pen'); // Set default
 </script>
 
 </body>
