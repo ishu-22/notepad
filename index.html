@@ -3,27 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Master-Board Pro</title>
+    <title>Master-Board v4</title>
     
-    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- FontAwesome for Icons (Fixes the square box issue) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
         :root { --primary: #3d5afe; --dark: #121212; --panel: #252525; --text: #ffffff; }
         body { margin: 0; background: var(--dark); color: var(--text); font-family: 'Inter', sans-serif; overflow: hidden; touch-action: none; }
 
-        /* Navigation Bar (Top) */
         #top-bar {
             position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
             background: var(--panel); padding: 5px 20px; border-radius: 30px;
             display: flex; gap: 20px; align-items: center; z-index: 1000; border: 1px solid #444;
         }
 
-        /* Floating Toolbar (Bottom) */
         #toolbar {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: var(--panel); padding: 10px; border-radius: 20px;
@@ -36,17 +32,15 @@
             border-radius: 12px; cursor: pointer; transition: 0.2s; font-size: 16px;
             display: flex; align-items: center; justify-content: center; width: 45px; height: 45px;
         }
-        .btn:hover { background: #444; }
         .active { background: var(--primary) !important; }
 
-        /* Background Classes */
-        .bg-dark { background-color: #121212; background-image: none; }
-        .bg-white { background-color: #ffffff; background-image: none; }
-        .bg-grid { background-image: radial-gradient(#333 1px, transparent 1px); background-size: 40px 40px; }
-        .bg-ruled { background-image: linear-gradient(#333 1px, transparent 1px); background-size: 100% 35px; }
+        /* Background Visuals */
+        .bg-dark { background-color: #121212; }
+        .bg-white { background-color: #ffffff; }
+        .bg-grid { background-image: radial-gradient(#333 1px, transparent 1px); background-size: 40px 40px; background-color: #121212; }
+        .bg-ruled { background-image: linear-gradient(#333 1px, transparent 1px); background-size: 100% 35px; background-color: #121212; }
 
         #pdfInput { display: none; }
-        canvas { outline: none; }
     </style>
 </head>
 <body class="bg-grid">
@@ -63,18 +57,14 @@
     <button class="btn" id="highBtn" onclick="setBrush('highlighter')"><i class="fas fa-marker"></i></button>
     <button class="btn" id="eraserBtn" onclick="setBrush('eraser')"><i class="fas fa-eraser"></i></button>
     
-    <div style="width:1px; height:30px; background:#444;"></div>
-    
     <input type="color" id="colorPicker" value="#ffffff" onchange="updateBrush()">
     
-    <select id="bgPicker" onchange="changeBackground(this.value)" style="background:#333; color:white; border:none; padding:5px; border-radius:5px;">
+    <select id="bgPicker" onchange="changeBackground(this.value)" style="background:#333; color:white; border:none; padding:10px; border-radius:10px;">
         <option value="bg-grid">Grid</option>
         <option value="bg-dark">Dark</option>
         <option value="bg-white">White</option>
         <option value="bg-ruled">Ruled</option>
     </select>
-
-    <div style="width:1px; height:30px; background:#444;"></div>
 
     <button class="btn" onclick="document.getElementById('pdfInput').click()"><i class="fas fa-file-upload"></i></button>
     <button class="btn" onclick="exportFullPDF()" style="background:#2e7d32;"><i class="fas fa-file-export"></i></button>
@@ -87,8 +77,9 @@
     const { jsPDF } = window.jspdf;
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-    let pages = [null]; // Stores JSON data of each page
+    let pages = [null];
     let currentPage = 0;
+    let currentBG = 'bg-grid';
 
     const canvas = new fabric.Canvas('mainCanvas', {
         width: window.innerWidth,
@@ -97,13 +88,7 @@
     });
 
     // --- Page Management ---
-    function updatePageDisplay() {
-        document.getElementById('pageDisplay').innerText = `Page: ${currentPage + 1} / ${pages.length}`;
-    }
-
-    function saveCurrentPageState() {
-        pages[currentPage] = JSON.stringify(canvas);
-    }
+    function saveCurrentPageState() { pages[currentPage] = JSON.stringify(canvas); }
 
     function nextPage() {
         if (currentPage < pages.length - 1) {
@@ -140,6 +125,49 @@
         updatePageDisplay();
     }
 
+    function updatePageDisplay() {
+        document.getElementById('pageDisplay').innerText = `Page: ${currentPage + 1} / ${pages.length}`;
+    }
+
+    // --- TRUE ERASER Logic ---
+    // Fabric 5.3 doesn't have a native eraser brush, so we use "destination-out"
+    function setBrush(type) {
+        canvas.isDrawingMode = true;
+        document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+        const color = document.getElementById('colorPicker').value;
+
+        if (type === 'pen') {
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+            canvas.freeDrawingBrush.width = 5;
+            canvas.freeDrawingBrush.color = color;
+            canvas.freeDrawingBrush.globalCompositeOperation = 'source-over';
+            document.getElementById('penBtn').classList.add('active');
+        } else if (type === 'highlighter') {
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+            canvas.freeDrawingBrush.width = 30;
+            canvas.freeDrawingBrush.color = color + '50';
+            canvas.freeDrawingBrush.globalCompositeOperation = 'source-over';
+            document.getElementById('highBtn').classList.add('active');
+        } else if (type === 'eraser') {
+            // This is the "True Eraser" - it removes pixels rather than painting over them
+            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+            canvas.freeDrawingBrush.width = 40;
+            canvas.freeDrawingBrush.globalCompositeOperation = 'destination-out';
+            document.getElementById('eraserBtn').classList.add('active');
+        }
+    }
+
+    function updateBrush() {
+        if (canvas.freeDrawingBrush && canvas.freeDrawingBrush.globalCompositeOperation !== 'destination-out') {
+            canvas.freeDrawingBrush.color = document.getElementById('colorPicker').value;
+        }
+    }
+
+    function changeBackground(className) {
+        document.body.className = className;
+        currentBG = className;
+    }
+
     // --- PDF Multi-Page Upload ---
     document.getElementById('pdfInput').addEventListener('change', async (e) => {
         const file = e.target.files[0];
@@ -147,8 +175,6 @@
         reader.onload = async function() {
             const typedarray = new Uint8Array(this.result);
             const pdf = await pdfjsLib.getDocument(typedarray).promise;
-            
-            // Loop through all pages in the PDF
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const viewport = page.getViewport({ scale: 1.5 });
@@ -156,20 +182,14 @@
                 const context = tempCanvas.getContext('2d');
                 tempCanvas.height = viewport.height;
                 tempCanvas.width = viewport.width;
-
                 await page.render({ canvasContext: context, viewport: viewport }).promise;
                 
-                // Add as a new page slide
-                const imgData = tempCanvas.toDataURL();
-                fabric.Image.fromURL(imgData, (img) => {
+                fabric.Image.fromURL(tempCanvas.toDataURL(), (img) => {
                     img.set({ selectable: false });
-                    
                     if (i === 1 && pages[0] === null) {
-                        // Put first page on current empty slide
                         canvas.add(img);
                         canvas.sendToBack(img);
                     } else {
-                        // Create new slides for subsequent PDF pages
                         const newCanvas = new fabric.Canvas(null, { width: window.innerWidth, height: window.innerHeight });
                         newCanvas.add(img);
                         pages.push(JSON.stringify(newCanvas));
@@ -181,43 +201,7 @@
         reader.readAsArrayBuffer(file);
     });
 
-    // --- Brushes & Backgrounds ---
-    function setBrush(type) {
-        canvas.isDrawingMode = true;
-        document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-        const color = document.getElementById('colorPicker').value;
-
-        if (type === 'pen') {
-            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-            canvas.freeDrawingBrush.width = 5;
-            canvas.freeDrawingBrush.color = color;
-            document.getElementById('penBtn').classList.add('active');
-        } else if (type === 'highlighter') {
-            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-            canvas.freeDrawingBrush.width = 30;
-            canvas.freeDrawingBrush.color = color + '50';
-            document.getElementById('highBtn').classList.add('active');
-        } else if (type === 'eraser') {
-            canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-            canvas.freeDrawingBrush.width = 40;
-            // Matches the current background color logic
-            canvas.freeDrawingBrush.color = document.body.classList.contains('bg-white') ? '#ffffff' : '#121212';
-            document.getElementById('eraserBtn').classList.add('active');
-        }
-    }
-
-    function updateBrush() {
-        const color = document.getElementById('colorPicker').value;
-        if (canvas.freeDrawingBrush) canvas.freeDrawingBrush.color = color;
-    }
-
-    function changeBackground(className) {
-        document.body.className = className;
-        // Adjust eraser color based on background
-        if (document.getElementById('eraserBtn').classList.contains('active')) setBrush('eraser');
-    }
-
-    // --- Export Multi-Page PDF ---
+    // --- EXPORT WITH BACKGROUND ---
     async function exportFullPDF() {
         saveCurrentPageState();
         const pdf = new jsPDF('l', 'px', [canvas.width, canvas.height]);
@@ -225,27 +209,62 @@
         for (let i = 0; i < pages.length; i++) {
             if (i > 0) pdf.addPage([canvas.width, canvas.height], 'l');
             
-            // Temporary canvas to render each state for the PDF
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = canvas.width;
             tempCanvas.height = canvas.height;
+            const ctx = tempCanvas.getContext('2d');
+
+            // 1. Draw the Background to the PDF canvas
+            if (currentBG === 'bg-white') {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            } else {
+                ctx.fillStyle = '#121212';
+                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                
+                ctx.strokeStyle = '#333333';
+                ctx.lineWidth = 1;
+                
+                if (currentBG === 'bg-grid') {
+                    for (let x = 0; x <= tempCanvas.width; x += 40) {
+                        for (let y = 0; y <= tempCanvas.height; y += 40) {
+                            ctx.beginPath();
+                            ctx.arc(x, y, 1, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+                    }
+                } else if (currentBG === 'bg-ruled') {
+                    for (let y = 0; y <= tempCanvas.height; y += 35) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, y);
+                        ctx.lineTo(tempCanvas.width, y);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            // 2. Overlay the Fabric.js drawing
             const tempFabric = new fabric.StaticCanvas(tempCanvas);
-            
             await new Promise(resolve => {
                 tempFabric.loadFromJSON(pages[i], () => {
-                    const imgData = tempFabric.toDataURL({ format: 'png' });
-                    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                    resolve();
+                    const drawingData = tempFabric.toDataURL({ format: 'png' });
+                    // Draw drawing on top of our manual background
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0);
+                        const finalData = tempCanvas.toDataURL('image/png');
+                        pdf.addImage(finalData, 'PNG', 0, 0, canvas.width, canvas.height);
+                        resolve();
+                    };
+                    img.src = drawingData;
                 });
             });
         }
-        pdf.save("class-notes.pdf");
+        pdf.save("teacher-notes-pro.pdf");
     }
 
-    // Initialize
     window.addEventListener('resize', () => canvas.setDimensions({ width: window.innerWidth, height: window.innerHeight }));
     setBrush('pen');
-    updatePageDisplay();
 </script>
 
 </body>
