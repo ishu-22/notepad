@@ -3,166 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Master-Board Tablet Pro</title>
+    <title>Ultimate Tablet Board v6</title>
     
-    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        :root { --p: #3d5afe; --bg: #0f0f0f; --surface: rgba(30, 30, 30, 0.85); --text: #ffffff; }
+        :root { --p: #3d5afe; --bg: #0f0f0f; --panel: rgba(25, 25, 25, 0.9); }
         
-        body { 
-            margin: 0; background: var(--bg); color: var(--text); 
-            font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; touch-action: none; 
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background: var(--bg); overflow: hidden; font-family: sans-serif;
         }
 
-        /* Glassmorphism Toolbar */
+        /* The Board Backgrounds (CSS Layer) */
+        #board-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
+        }
+        .grid { background-image: radial-gradient(#333 1px, transparent 1px); background-size: 40px 40px; }
+        .ruled { background-image: linear-gradient(#333 1px, transparent 1px); background-size: 100% 35px; }
+        .white { background: #ffffff; }
+        .dark { background: #0f0f0f; }
+
+        /* The Drawing Canvas (Transparent Layer) */
+        .canvas-container { position: absolute !important; top: 0; left: 0; z-index: 5; }
+
+        /* UI Elements */
+        #ui-layer { position: relative; z-index: 10; pointer-events: none; height: 100%; }
+        #ui-layer button, #ui-layer select, #ui-layer input { pointer-events: auto; }
+
         #toolbar {
-            position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
-            background: var(--surface); backdrop-filter: blur(15px);
-            padding: 12px 20px; border-radius: 24px; display: flex; gap: 15px; 
-            align-items: center; box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
-            z-index: 1000; border: 1px solid rgba(255,255,255,0.1);
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: var(--panel); backdrop-filter: blur(10px);
+            padding: 15px; border-radius: 25px; display: flex; gap: 15px;
+            border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 50px rgba(0,0,0,0.5);
         }
 
         #top-bar {
             position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            background: var(--surface); backdrop-filter: blur(10px);
-            padding: 8px 25px; border-radius: 50px; display: flex; gap: 20px; 
-            align-items: center; z-index: 1000; border: 1px solid rgba(255,255,255,0.1);
+            background: var(--panel); backdrop-filter: blur(10px);
+            padding: 10px 30px; border-radius: 50px; display: flex; gap: 20px; align-items: center;
         }
 
         .btn {
-            background: rgba(255,255,255,0.05); border: none; color: white; 
-            width: 50px; height: 50px; border-radius: 16px; cursor: pointer; 
-            font-size: 18px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex; align-items: center; justify-content: center;
+            background: #333; border: none; color: white; width: 55px; height: 55px;
+            border-radius: 18px; cursor: pointer; font-size: 20px; transition: 0.2s;
         }
-        .btn:active { transform: scale(0.9); }
-        .active { background: var(--p) !important; box-shadow: 0 0 20px rgba(61, 90, 254, 0.4); }
-
-        select, input[type="color"] {
-            background: #333; border: none; color: white; padding: 10px; border-radius: 10px; outline: none;
-        }
-
-        /* Background Visuals for the App */
-        .bg-dark { background-color: #0f0f0f; }
-        .bg-white { background-color: #ffffff; }
-        .bg-grid { background-image: radial-gradient(#333 1px, transparent 1px); background-size: 40px 40px; background-color: #0f0f0f; }
-        .bg-ruled { background-image: linear-gradient(#333 1px, transparent 1px); background-size: 100% 35px; background-color: #0f0f0f; }
-
-        #pdfInput { display: none; }
-        #canvas-container { width: 100vw; height: 100vh; }
+        .active { background: var(--p) !important; box-shadow: 0 0 15px var(--p); }
+        
+        #pageInfo { font-weight: bold; color: white; min-width: 60px; text-align: center; }
     </style>
 </head>
-<body class="bg-grid">
+<body class="grid" id="main-body">
 
-<div id="top-bar">
-    <button class="btn" onclick="prevPage()"><i class="fas fa-chevron-left"></i></button>
-    <span id="pageDisplay" style="font-weight: 600; min-width: 80px; text-align: center;">1 / 1</span>
-    <button class="btn" onclick="nextPage()"><i class="fas fa-chevron-right"></i></button>
-    <button class="btn" onclick="addBlankPage()"><i class="fas fa-plus"></i></button>
+<div id="board-container" class="grid"></div>
+
+<div id="ui-layer">
+    <div id="top-bar">
+        <button class="btn" onclick="changePage(-1)"><i class="fas fa-chevron-left"></i></button>
+        <span id="pageInfo">1 / 1</span>
+        <button class="btn" onclick="changePage(1)"><i class="fas fa-chevron-right"></i></button>
+        <button class="btn" onclick="addNewPage()"><i class="fas fa-plus"></i></button>
+    </div>
+
+    <div id="toolbar">
+        <button class="btn active" id="penBtn" onclick="setTool('pen')"><i class="fas fa-pencil-alt"></i></button>
+        <button class="btn" id="highBtn" onclick="setTool('highlighter')"><i class="fas fa-highlighter"></i></button>
+        <button class="btn" id="eraserBtn" onclick="setTool('eraser')"><i class="fas fa-eraser"></i></button>
+        
+        <input type="color" id="colorPicker" value="#ffffff" style="width:40px;height:40px;border:none;background:none;">
+        
+        <select id="bgSelect" onchange="updateBG(this.value)" style="background:#444;color:white;border-radius:10px;padding:5px;">
+            <option value="grid">Grid</option>
+            <option value="dark">Dark</option>
+            <option value="white">White</option>
+            <option value="ruled">Ruled</option>
+        </select>
+
+        <button class="btn" onclick="document.getElementById('pdfLoader').click()"><i class="fas fa-file-import"></i></button>
+        <button class="btn" onclick="saveFullPDF()" style="background:#2e7d32;"><i class="fas fa-download"></i></button>
+    </div>
 </div>
 
-<div id="toolbar">
-    <button class="btn active" id="penBtn" onclick="setBrush('pen')"><i class="fas fa-pen-nib"></i></button>
-    <button class="btn" id="highBtn" onclick="setBrush('highlighter')"><i class="fas fa-highlighter"></i></button>
-    <button class="btn" id="eraserBtn" onclick="setBrush('eraser')"><i class="fas fa-eraser"></i></button>
-    
-    <input type="color" id="colorPicker" value="#ffffff" onchange="updateBrush()">
-    
-    <select id="bgPicker" onchange="changeBackground(this.value)">
-        <option value="bg-grid">Grid Board</option>
-        <option value="bg-dark">Dark Board</option>
-        <option value="bg-white">Whiteboard</option>
-        <option value="bg-ruled">Ruled Board</option>
-    </select>
-
-    <button class="btn" onclick="document.getElementById('pdfInput').click()"><i class="fas fa-cloud-upload-alt"></i></button>
-    <button class="btn" onclick="exportFullPDF()" style="background:#1b5e20;"><i class="fas fa-file-pdf"></i></button>
-</div>
-
-<input type="file" id="pdfInput" accept="application/pdf">
-<div id="canvas-container">
-    <canvas id="mainCanvas"></canvas>
-</div>
+<input type="file" id="pdfLoader" hidden accept="application/pdf">
+<canvas id="sheet"></canvas>
 
 <script>
     const { jsPDF } = window.jspdf;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-    let pages = [null];
-    let currentPage = 0;
-    let currentBG = 'bg-grid';
-
-    const canvas = new fabric.Canvas('mainCanvas', {
+    const canvas = new fabric.Canvas('sheet', {
         width: window.innerWidth,
         height: window.innerHeight,
         isDrawingMode: true,
-        backgroundColor: null // Keep transparent to allow eraser to work properly
+        backgroundColor: null // CRITICAL: Must be null for true erasing
     });
 
-    // --- Page Persistence ---
-    function saveCurrentPageState() { pages[currentPage] = JSON.stringify(canvas); }
-    function nextPage() { if (currentPage < pages.length - 1) { saveCurrentPageState(); currentPage++; loadPage(currentPage); } }
-    function prevPage() { if (currentPage > 0) { saveCurrentPageState(); currentPage--; loadPage(currentPage); } }
-    function addBlankPage() { saveCurrentPageState(); pages.push(null); currentPage = pages.length - 1; canvas.clear(); updatePageDisplay(); }
-    function updatePageDisplay() { document.getElementById('pageDisplay').innerText = `${currentPage + 1} / ${pages.length}`; }
+    let pageData = [null];
+    let activePage = 0;
+    let currentMode = 'pen';
 
-    function loadPage(index) {
-        canvas.clear();
-        if (pages[index]) {
-            canvas.loadFromJSON(pages[index], () => {
-                canvas.renderAll();
-                updateBrush();
-            });
-        }
-        updatePageDisplay();
-    }
-
-    // --- BRUSH LOGIC (FIXED ERASER) ---
-    function setBrush(type) {
+    // --- TRUE ERASER ENGINE ---
+    function setTool(tool) {
+        currentMode = tool;
         canvas.isDrawingMode = true;
         document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+        
         const color = document.getElementById('colorPicker').value;
 
-        if (type === 'pen') {
+        if (tool === 'pen') {
             canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
             canvas.freeDrawingBrush.width = 4;
             canvas.freeDrawingBrush.color = color;
+            // Standard drawing mode
             canvas.freeDrawingBrush.globalCompositeOperation = 'source-over';
             document.getElementById('penBtn').classList.add('active');
-        } else if (type === 'highlighter') {
+        } 
+        else if (tool === 'highlighter') {
             canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-            canvas.freeDrawingBrush.width = 35;
-            canvas.freeDrawingBrush.color = color + '40'; // 25% Opacity
+            canvas.freeDrawingBrush.width = 30;
+            canvas.freeDrawingBrush.color = color + '44'; // 25% transparency
             canvas.freeDrawingBrush.globalCompositeOperation = 'source-over';
             document.getElementById('highBtn').classList.add('active');
-        } else if (type === 'eraser') {
-            // THE FIX: Use destination-out to actually remove the pixels from the canvas
+        }
+        else if (tool === 'eraser') {
+            // THE FIX: This specific operation "cuts" through the drawing
             canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-            canvas.freeDrawingBrush.width = 40;
+            canvas.freeDrawingBrush.width = 50;
             canvas.freeDrawingBrush.globalCompositeOperation = 'destination-out';
             document.getElementById('eraserBtn').classList.add('active');
         }
     }
 
-    function updateBrush() {
-        if (canvas.freeDrawingBrush && canvas.freeDrawingBrush.globalCompositeOperation !== 'destination-out') {
-            canvas.freeDrawingBrush.color = document.getElementById('colorPicker').value;
+    // --- PAGE SYSTEM ---
+    function updatePageUI() {
+        document.getElementById('pageInfo').innerText = `${activePage + 1} / ${pageData.length}`;
+    }
+
+    function addNewPage() {
+        pageData[activePage] = JSON.stringify(canvas);
+        pageData.push(null);
+        activePage = pageData.length - 1;
+        canvas.clear();
+        updatePageUI();
+    }
+
+    function changePage(dir) {
+        let target = activePage + dir;
+        if (target >= 0 && target < pageData.length) {
+            pageData[activePage] = JSON.stringify(canvas);
+            activePage = target;
+            canvas.clear();
+            if (pageData[activePage]) {
+                canvas.loadFromJSON(pageData[activePage], () => {
+                    canvas.renderAll();
+                    setTool(currentMode); // Re-apply brush settings
+                });
+            }
+            updatePageUI();
         }
     }
 
-    function changeBackground(className) {
-        document.body.className = className;
-        currentBG = className;
+    function updateBG(type) {
+        const container = document.getElementById('board-container');
+        container.className = type;
     }
 
-    // --- PDF IMPORT ---
-    document.getElementById('pdfInput').addEventListener('change', async (e) => {
+    // --- PDF EXPORT (WITH BAKE-IN BACKGROUND) ---
+    async function saveFullPDF() {
+        pageData[activePage] = JSON.stringify(canvas);
+        const pdf = new jsPDF('l', 'px', [canvas.width, canvas.height]);
+        const bgType = document.getElementById('bgSelect').value;
+
+        for (let i = 0; i < pageData.length; i++) {
+            if (i > 0) pdf.addPage([canvas.width, canvas.height], 'l');
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const ctx = tempCanvas.getContext('2d');
+
+            // 1. Manually Draw Background into PDF
+            if (bgType === 'white') {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            } else {
+                ctx.fillStyle = '#0f0f0f';
+                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                ctx.strokeStyle = '#333333';
+                if (bgType === 'grid') {
+                    for(let x=0; x<tempCanvas.width; x+=40) {
+                        for(let y=0; y<tempCanvas.height; y+=40) {
+                            ctx.strokeRect(x, y, 0.5, 0.5);
+                        }
+                    }
+                } else if (bgType === 'ruled') {
+                    for(let y=0; y<tempCanvas.height; y+=35) {
+                        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(tempCanvas.width, y); ctx.stroke();
+                    }
+                }
+            }
+
+            // 2. Overlay drawing
+            await new Promise(resolve => {
+                const scout = new fabric.StaticCanvas(null, { width: canvas.width, height: canvas.height });
+                scout.loadFromJSON(pageData[i], () => {
+                    const data = scout.toDataURL();
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0);
+                        pdf.addImage(tempCanvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+                        resolve();
+                    };
+                    img.src = data;
+                });
+            });
+        }
+        pdf.save("ClassNotes_Final.pdf");
+    }
+
+    // PDF Upload Logic
+    document.getElementById('pdfLoader').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = async function() {
@@ -171,83 +232,26 @@
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const viewport = page.getViewport({ scale: 2 });
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.height = viewport.height;
-                tempCanvas.width = viewport.width;
-                await page.render({ canvasContext: tempCanvas.getContext('2d'), viewport: viewport }).promise;
+                const tempC = document.createElement('canvas');
+                tempC.height = viewport.height; tempC.width = viewport.width;
+                await page.render({ canvasContext: tempC.getContext('2d'), viewport: viewport }).promise;
                 
-                fabric.Image.fromURL(tempCanvas.toDataURL(), (img) => {
-                    img.set({ selectable: true, scaleX: 0.5, scaleY: 0.5 });
-                    if (i === 1 && pages[0] === null) {
-                        canvas.add(img); canvas.sendToBack(img);
-                    } else {
+                fabric.Image.fromURL(tempC.toDataURL(), (img) => {
+                    img.set({ scaleX: 0.5, scaleY: 0.5 });
+                    if (i === 1 && pageData[0] === null) { canvas.add(img); canvas.sendToBack(img); }
+                    else {
                         const nc = new fabric.Canvas(null, { width: canvas.width, height: canvas.height });
-                        nc.add(img); pages.push(JSON.stringify(nc));
+                        nc.add(img); pageData.push(JSON.stringify(nc));
                     }
-                    updatePageDisplay();
+                    updatePageUI();
                 });
             }
         };
         reader.readAsArrayBuffer(file);
     });
 
-    // --- THE BIG PDF EXPORT FIX ---
-    async function exportFullPDF() {
-        saveCurrentPageState();
-        const pdf = new jsPDF('l', 'px', [canvas.width, canvas.height]);
-        
-        for (let i = 0; i < pages.length; i++) {
-            if (i > 0) pdf.addPage([canvas.width, canvas.height], 'l');
-            
-            // Create a temporary canvas to burn the background into the image
-            const renderCanvas = document.createElement('canvas');
-            renderCanvas.width = canvas.width;
-            renderCanvas.height = canvas.height;
-            const ctx = renderCanvas.getContext('2d');
-
-            // 1. Manually paint the background into the PDF frame
-            if (currentBG === 'bg-white') {
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
-            } else {
-                ctx.fillStyle = '#0f0f0f'; // Dark base
-                ctx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
-                
-                // Draw Grid or Lines if needed
-                ctx.strokeStyle = '#333333';
-                ctx.lineWidth = 1;
-                if (currentBG === 'bg-grid') {
-                    for (let x = 0; x <= renderCanvas.width; x += 40) {
-                        for (let y = 0; y <= renderCanvas.height; y += 40) {
-                            ctx.beginPath(); ctx.arc(x, y, 0.8, 0, Math.PI * 2); ctx.stroke();
-                        }
-                    }
-                } else if (currentBG === 'bg-ruled') {
-                    for (let y = 0; y <= renderCanvas.height; y += 35) {
-                        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(renderCanvas.width, y); ctx.stroke();
-                    }
-                }
-            }
-
-            // 2. Layer the drawings on top
-            await new Promise(resolve => {
-                const tempFabric = new fabric.StaticCanvas(null, { width: canvas.width, height: canvas.height });
-                tempFabric.loadFromJSON(pages[i], () => {
-                    const drawingImg = new Image();
-                    drawingImg.onload = () => {
-                        ctx.drawImage(drawingImg, 0, 0);
-                        pdf.addImage(renderCanvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
-                        resolve();
-                    };
-                    drawingImg.src = tempFabric.toDataURL();
-                });
-            });
-        }
-        pdf.save("Class_Notes.pdf");
-    }
-
     window.addEventListener('resize', () => canvas.setDimensions({ width: window.innerWidth, height: window.innerHeight }));
-    setBrush('pen');
+    setTool('pen');
 </script>
 
 </body>
